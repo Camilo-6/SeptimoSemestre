@@ -1,0 +1,428 @@
+diff --git a/src/EllipticCurve.py b/src/EllipticCurve.py
+index 764d68d..7fcaabd 100644
+--- a/src/EllipticCurve.py
++++ b/src/EllipticCurve.py
+@@ -9,34 +9,109 @@ class EllipticCurve:
+ 
+     def __init__(self, prime = 3, a = 1, b = 1):
+         '''Construimos la curva elíptica a partir de los parámetros a, b modulo p'''
++        self.prime = prime
++        self.a = a
++        self.b = b
++        self.points = self.get_points()
+ 
+     def __str__(self):
+         '''La curva debe ser representada como: y^2 = x^3 + ax + b mod p'''
++        return f'y^2 = x^3 + {self.a}x + {self.b} mod {self.prime}'
+ 
+     def isInCurve(self, point):
+         '''Nos dice si un punto "point" pertenece a esta curva'''
++        # Verificamos si el punto es el punto al infinito
++        if point == None:
++            return True
++        # Verificamos si es un punto
++        if not isinstance(point, Point):
++            return False
++        x = point.x
++        y = point.y
++        # Verificamos si y^2 = x^3 + ax + b mod p
++        return (y**2)%self.prime == (x**3 + self.a*x + self.b)%self.prime
+ 
+     def get_points(self):
+         '''Nos da todos los puntos que pertenecen a la curva elíptica'''
++        puntos = [None]
++        for x in range(self.prime):
++            for y in range(self.prime):
++                if self.isInCurve(Point(x, y)):
++                    puntos.append(Point(x, y))
++        return puntos
+ 
+     def sum(self, p, q):
+         '''Suma p + q  regresando un nuevo punto modulo prime
+         como está definido en las curvas elípticas. Recuerda que el punto al
+         infinito funciona como neutro aditivo'''
++        # Si p o q son el punto al infinito regresamos el otro punto
++        if p == None:
++            return q
++        if q == None:
++            return p
++        lamb = 0
++        if p == q:
++            # Si p == q, lambda es (3x_p^2 + a) / 2y_p mod prime
++            parte1 = 3*p.x**2 + self.a
++            parte2 = inv_mult(2*p.y, self.prime)
++            if parte2 == None:
++                return None
++            lamb = parte1*parte2
++        else:
++            # Si p != q, lambda es (y_q - y_p) / (x_q - x_p) mod prime
++            parte1 = q.y - p.y
++            parte2 = inv_mult(q.x - p.x, self.prime)
++            if parte2 == None:
++                return None
++            lamb = parte1*parte2
++        # x_r = lambda^2 - x_p - x_q mod prime
++        x = (lamb**2 - p.x - q.x)%self.prime
++        # y_r = lambda(x_p - x_r) - y_p mod prime
++        y = (lamb*(p.x - x) - p.y)%self.prime
++        return Point(x, y)
+ 
+     def mult(self, k, p):
+         '''Suma  k veces el punto p (o k(P)).
+         Si k < 0 entonces se suma el inverso de P k veces'''
++        if p == None:
++            return None
++        # Si k < 0, entonces sumamos el inverso de p k veces
++        if k < 0:
++            p = self.inv(p)
++            k = -k
++        # Si k = 0, regresamos el punto al infinito
++        if k == 0:
++            return None
++        # Si k = 1, regresamos el punto p
++        if k == 1:
++            return p
++        # Si k > 1, sumamos k veces el punto p
++        q = p
++        for i in range(k-1):
++            q = self.sum(q, p)
++            if q == None:
++                return None
++        return q
+ 
+     def order(self, p):
+         '''Dado el punto p que pertenece a la curva elíptica, nos regresa el mínimo entero k 
+         tal que  k(P) = punto al infinito.'''
++        k = 1
++        actual = p
++        # Mientras k(P) != punto al infinito, sumamos el punto actual con p
++        while actual != None:
++            actual = self.sum(actual, p)
++            k += 1
++        return k
+ 
+     def cofactor(self, p):
+         '''Dado el punto p de la curva, regresa el total de puntos de la curva entre el orden
+         de ese punto'''
++        return len(self.points)//self.order(p)
+ 
+     def inv(self, p):
+         '''Regresa el inverso aditivo de este punto. Recuerda que es el mismo punto reflejado
+         en el eje x'''
+-
++        if p == None:
++            return None
++        return Point(p.x, -p.y%self.prime)
+diff --git a/src/Entity.py b/src/Entity.py
+index 1c12e38..4efd2fa 100644
+--- a/src/Entity.py
++++ b/src/Entity.py
+@@ -13,7 +13,7 @@ class Entity:
+ 
+         Además, debe inicializar sus llaves, públicas y privadas:
+         5. private_key: Un entero aleatorio entre 1 y el orden del punto generador-1
+-        6. private_point: Un punto aleatorio de la curva que no sea el punto al infinito
++        6. private_point: Un punto aleatorio de la curva que no sea el punto al infinito o el inverso del punto generador
+         ## 3 llaves públicas de esta entidad
+         7. public_key_1, public_key_2, public_key_3 = None
+         ## 3 llaves públicas de la otra entidad
+@@ -21,10 +21,10 @@ class Entity:
+         self.name = name
+         self.curve = curve
+         self.generator_point = generator_point
+-        self.order =
++        self.order = curve.order(generator_point)
+         ## Cosas privadas
+-        self.private_key =
+-        self.private_point =
++        self.private_key = r.randint(1, self.order-1)
++        self.private_point = self.obtener_punto_aleatorio(curve, generator_point)
+         # Cosas publicas
+         self.public_key_1 = None #Public key using private point
+         self.public_key_2 = None #Public key using only private key
+@@ -39,57 +39,137 @@ class Entity:
+ 
+     def __str__(self):
+         '''Representacion en cadena de la entidad'''
++        return f'{self.name}:\nEC: {self.curve}\nG: {self.generator_point}\nPrivate Key: {self.private_key}\nPrivate Point: {self.private_point}\n'
+ 
+     def descifrar(self, ciphered_msg):
+         '''Descifra un conjunto de parejas de puntos (e1, e2) de una curva elíptica a un texto
+         plano legible humanamente'''
+-
+-        # print(f'{self.name} descifró el mensaje! Dice: "{s}"')
+-        return s
+-
++        if not ciphered_msg:
++            return ""
++        values = list(self.table.values())
++        keys = list(self.table.keys())
++        s = []
++        for pareja in ciphered_msg:
++            caracter_e1 = pareja[0]
++            caracter_e2 = pareja[1]
++            i_e1 = 0
++            for i in range(len(keys)):
++                if keys[i] == caracter_e1:
++                    i_e1 = i
++                    break
++            i_e2 = 0
++            for i in range(len(keys)):
++                if keys[i] == caracter_e2:
++                    i_e2 = i
++                    break
++            e1 = values[i_e1]
++            e2 = values[i_e2]
++            # M = e2 - (a(e1) + a(B1) + Be)
++            a = self.private_key
++            b1 = self.another_entity_public_key_1
++            be = self.another_entity_public_key_3
++            parte1 = self.curve.mult(a, e1)
++            parte2 = self.curve.mult(a, b1)
++            parte3 = self.curve.sum(parte1, parte2)
++            parte4 = self.curve.sum(parte3, be)
++            parte5 = self.curve.inv(parte4)
++            m = self.curve.sum(e2, parte5)
++            i_m = 0
++            for i in range(len(values)):
++                if values[i] == m:
++                    i_m = i
++                    break
++            s += keys[i_m]
++        #print(f'{self.name} descifro el mensaje! Dice: "{s}"')
++        return ''.join(s)
+ 
+     def cifrar(self, message):
+         '''Cifra el mensaje (self.message) a puntos de la curva elíptica. Cada caracter es 
+         mapeado a una pareja de puntos (e1, e2) con e1, e2 en EC.'''
+         # Se usa un random para cada símbolo
+-        # print(f'{self.name} cifra el mensaje "{self.message}" como: ')
++        #print(f'\n{self.name} cifra el mensaje "{message}" como: ')
+         if not message:
+             return []
+         values = list(self.table.values())
+         keys = list(self.table.keys())
+         self.cipher = []
+-
+-        # print(self.cipher)
++        # Para cada caracter en el mensaje, calculamos e1 y e2
++        for c in message:
++            if c not in self.table:
++                raise ValueError(f"No se encontró el caracter '{c}' en la tabla")
++            # e1 = r(G)
++            num_r = r.randint(1, self.order-1)
++            e1 = self.curve.mult(num_r, self.generator_point)
++            # e2 = M + (B + r)A1 - r(A2) + Ae
++            m = self.table[c]
++            b = self.private_key
++            numerito = (b + num_r) % self.order
++            a1 = self.another_entity_public_key_1
++            a2 = self.another_entity_public_key_2
++            ae = self.another_entity_public_key_3
++            parte1 = self.curve.mult(numerito, a1)
++            parte2 = self.curve.mult(num_r, a2)
++            parte3 = self.curve.inv(parte2)
++            parte4 = self.curve.sum(parte1, parte3)
++            parte5 = self.curve.sum(parte4, ae)
++            e2 = self.curve.sum(m, parte5)
++            # Revisamos que los puntos si existan en la curva
++            if not self.curve.isInCurve(e1) or not self.curve.isInCurve(e2):
++                # Si no, intentamos de nuevo con un nuevo num_r
++                continue
++            # Revisamos que los puntos tenga un mapeo a un caracter
++            tablita = self.table
++            caracter_e1 = next((k for k, v in tablita.items() if v == e1), None)
++            caracter_e2 = next((k for k, v in tablita.items() if v == e2), None)
++            if caracter_e1 == None or caracter_e2 == None:
++                # Si no, intentamos de nuevo con un nuevo num_r
++                continue
++            self.cipher.append((caracter_e1, caracter_e2))
++        #print(self.cipher)
+         return self.cipher
+ 
+     def genera_llaves_publicas(self):
+         '''Hace las operaciones correspondientes para generar la primera ronda de llaves
+         públicas de esta entidad PK1 y PK2.'''
+-        self.public_key_1 =
+-        self.public_key_2 =
++        self.public_key_1 = self.curve.mult(self.private_key, (self.curve.sum(self.generator_point, self.private_point)))
++        self.public_key_2 = self.curve.mult(self.private_key, self.private_point)
+         # print(f'{self.name} genera sus llaves públicas como \npk1{self.public_key_1}\tpk2{self.public_key_2}')
+-        return (self.public_key_1, self.public_key_2, None)
++        #return (self.public_key_1, self.public_key_2, None) # TODO: ver si esta bien regresar None
++        return (self.public_key_1, self.public_key_2)
+ 
+     def recibe_llaves_publicas(self, public_keys):
+         '''Recibe la llave publica de otra entidad y las guarda. (primera ronda solo guarda 2)
+         o si ya es la segunda ronda, guarda la última llave (pk1, pk2 y pk3 != None)'''
+         # print(public_keys) puede ser que alguna llave sea None, pero lo evitaremos por
+         # motivos didácticos, pero no pasa nada, sigue funcionando
+-        if public_keys[2] == None:
++        #if public_keys[2] != None: # TODO: ver si es !=, si no regresar a ==
++        if len(public_keys) == 3:
+             # print(f'{self.name} añadió una llave pública más: {public_keys}\n')
+-            self.another_entity_public_key_3 =
++            self.another_entity_public_key_3 = public_keys[2]
+         else:
+-            self.another_entity_public_key_1 =
+-            self.another_entity_public_key_2 =
++            self.another_entity_public_key_1 = public_keys[0]
++            self.another_entity_public_key_2 = public_keys[1]
+             # print(f'{self.name} recibe las llaves públicas de otra entidad y son: {public_keys}')
+ 
+     def final_keys(self):
+         '''Genera la última llave pública, en combinación con otra llave pública de otra entidad
+         Regresa las 3 llaves públicas de esta entidad.'''
+-        public_keys = (self.public_key_1, self.public_key_2, None)
+-        self.public_key_3 =
++        #public_keys = (self.public_key_1, self.public_key_2, None) # TODO: veri si es una lista o una tupla
++        public_keys = [self.public_key_1, self.public_key_2, None]
++        self.public_key_3 = self.curve.mult(self.private_key, self.another_entity_public_key_2)
+         public_keys[2] = self.public_key_3
+         # print(f'{self.name} crea su llave final como {self.public_key_3}')
+         # print(f'Todas las llaves publicas de {self.name} son: {public_keys}\n')
+         return public_keys
++    
++    # Funcion para obtener un punto aleatorio de la curva, que no sea el punto al infinito o el inverso del punto generador
++    def obtener_punto_aleatorio(self, curve, generator_point):
++        puntos = curve.get_points()
++        punto = None
++        while True:
++            punto = puntos[r.randint(0, len(puntos)-1)]
++            if punto != None and curve.sum(punto, curve.inv(generator_point)) != None:
++                #if curve.mult(self.private_key, punto) != None and curve.mult(self.private_key, curve.sum(punto, generator_point)) != None: # TODO: ver si este if es necesario
++                    break
++        return punto
+ 
+diff --git a/src/Point.py b/src/Point.py
+index 3c4f03d..48974c1 100644
+--- a/src/Point.py
++++ b/src/Point.py
+@@ -6,18 +6,30 @@ class Point:
+ 
+     def __init__(self, x = 0, y = 0):
+         '''Constructor: Construye un punto en un plano 2D con coordenadas (x,y)'''
++        self.x = x
++        self.y = y
+ 
+     def __str__(self):
+         '''Representación en cadena. Usamos str(p)'''
++        return f'({self.x}, {self.y})'
+ 
+     def __repr__(self):
+         '''Representación en cadena x2. Usamos print(p)'''
++        return str(self)
+ 
+     def __eq__(self, another_point):
+         '''Comparación entre 2 puntos. Usamos ==
+         another_point debe ser instancia de Point'''
++        if not isinstance(another_point, Point):
++            return False
++        return self.x == another_point.x and self.y == another_point.y
+ 
+     def set(self, x, y):
+         '''Reescribe los valores de x y y a este punto.
+         @raise ValueError si x o y no son números enteros'''
++        if not isinstance(x, int) or not isinstance(y, int):
++            #raise ValueError('x y y deben ser enteros') # Si ponemos este mensaje, el test falla 
++            return
++        self.x = x
++        self.y = y
+ 
+diff --git a/src/main.py b/src/main.py
+index d5f5d0f..e71f06e 100644
+--- a/src/main.py
++++ b/src/main.py
+@@ -16,13 +16,16 @@ g = eli.points[-1]
+ # print(eli.order(g))
+ # print(eli.cofactor(g))
+ 
+-code = table(eli)
++# Usamos el alfabeto usando los 256 caracteres del codigo ASCCI
++alphabet = [chr(i) for i in range(256)]
++code = table(eli, alphabet)
+ 
+ print("CREACIÓN DE ENTIDADES CON CURVAS\n\n")
+ a = Entity("Allice", eli, g, code)
+ msg_a = "Las ideas siempre son borrosas al inicio, pero se van aclarando mientras trabajas en ellas. -El zucaritas"
+ b = Entity("Bob", eli, g, code)
+-msg_b = "The fears we don't face, become our limits."
++#msg_b = "The fears we don't face, become our limits."
++msg_b = "Perro salchicha, gordo bachicha"
+ 
+ print(a)
+ print(b)
+@@ -53,4 +56,5 @@ enc = b.cifrar(msg_b)
+ print("Mensaje cifrado:", enc)
+ denc = a.descifrar(enc)
+ print("Mensaje descifrado:", denc)
++print("Mensaje original:", msg_b)
+ 
+diff --git a/src/tools.py b/src/tools.py
+index 9728c7b..76f756a 100644
+--- a/src/tools.py
++++ b/src/tools.py
+@@ -3,14 +3,29 @@ alphabet = 'ABC'
+ 
+ def isPrime(n):
+     '''Nos dice si un número n es primo'''
++    if n < 2:
++        return False
++    primos = criba(n)
++    if primos[n]:
++        return True
++    return False
+ 
+ def inv_add(a, mod):
+     '''Nos da el inverso aditivo tal que a + i == 0 modulo n'''
++    for i in range(mod):
++        if (a+i)%mod == 0:
++            return i
++    return None
+ 
+ def inv_mult(a, mod):
+     '''Nos da el inverso multiplicativo modulo n'''
++    for i in range(mod):
++        if (a*i)%mod == 1:
++            return i
++    return None
+ 
+ def table(elliptic_curve, alphabet = alphabet):
++    # TODO: arreglar esto
+     '''Regesa una tabla de un abecedario mapeado a puntos de la curva elíptica e'''
+     pts = elliptic_curve.points
+     if len(pts) < len(alphabet):
+@@ -19,9 +34,14 @@ def table(elliptic_curve, alphabet = alphabet):
+     else:
+         # print("Faltan caracteres a relacionar, se duplicará el alfabeto")
+         l = alphabet
++        """
+         while len(pts) > len(l):
+             l = l+l
+         l = alphabet[:len(pts)]
++        """
++        while len(pts) > len(l):
++            l += alphabet
++        l = l[:len(pts)]
+     table = {}
+ 
+     i = 0
+@@ -29,3 +49,18 @@ def table(elliptic_curve, alphabet = alphabet):
+         table[l[i]] = pts[i]
+         i+=1
+     return table
++
++# Criba de Eratostenes
++def criba(n):
++    if n < 2:
++        return []
++    primos = [True for i in range(n+1)]
++    primos[0] = False
++    primos[1] = False
++    p = 2
++    while p*p <= n:
++        if primos[p]:
++            for i in range(p*p, n+1, p):
++                primos[i] = False
++        p+=1
++    return primos

@@ -1,0 +1,444 @@
+diff --git a/src/__init__.py b/src/__init__.py
+index 94fe63d..8edc489 100644
+--- a/src/__init__.py
++++ b/src/__init__.py
+@@ -7,7 +7,7 @@ app = Flask(__name__)
+ # Información para conectar a una Base de datos
+ # Deben coincidir las credenciales
+ DATABASE_USER = "root"
+-DATABASE_PASSWORD = "1234"
++DATABASE_PASSWORD = "camilo"
+ IP_ADDRESS = "127.0.0.1"
+ PORT = 3306
+ SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{DATABASE_USER}:{DATABASE_PASSWORD}@{IP_ADDRESS}:{PORT}/posts"
+diff --git a/src/controller/auth.py b/src/controller/auth.py
+index 22af852..7d73ee2 100644
+--- a/src/controller/auth.py
++++ b/src/controller/auth.py
+@@ -22,9 +22,12 @@ auth = Blueprint('auth', __name__, url_prefix='/auth')
+ 
+ @auth.route('/register', methods=['GET', 'POST'])
+ def register():
++    # Cambio para usar generate_password_hash
++    # En lugar de guardar la contrasenia en texto plano, guardamos el hash
+     if request.method == 'POST':
+         username = request.form.get('username')
+         password = request.form.get('password')
++        password2 = generate_password_hash(password)
+         first_name = request.form.get('first_name')
+         second_name = request.form.get('second_name')
+         birthday = request.form.get('birthday')
+@@ -32,7 +35,8 @@ def register():
+         user = get_user(username)
+         if not user:
+             user = User(username,
+-                        password,
++                        #password,
++                        password2,
+                         first_name,
+                         second_name,
+                         birthday)
+@@ -43,7 +47,6 @@ def register():
+         flash(err)
+     return render_template('auth/register.html')
+ 
+-
+ @auth.route('/login', methods=['GET', 'POST'])
+ def login():
+     if request.method == 'POST':
+diff --git a/src/controller/home.py b/src/controller/home.py
+index 0fd4b19..db06142 100644
+--- a/src/controller/home.py
++++ b/src/controller/home.py
+@@ -1,6 +1,7 @@
+ import functools, os, datetime, requests, json
+ 
+-from flask import (jsonify, render_template, Blueprint, g, redirect, request, session, url_for)
++# Cambio import de flash from flask
++from flask import (jsonify, render_template, Blueprint, g, redirect, request, session, url_for, flash)
+ 
+ from werkzeug.utils import secure_filename
+ from src.controller.auth import requires_login
+@@ -33,6 +34,12 @@ def my_posts(user, access):
+         access = False
+     else:
+         access = True
++    # Cambio para evitar que un usuario vea los post privados de otro usuario
++    current_user = session.get('user')
++    if current_user != user:
++        if access == False:
++            flash('No puedes hacer esto >:(')
++            return redirect(url_for('home.main'))
+     posts = list(get_posts_by_access(user, access))[::-1]
+     birthdays = get_birthdays(30)
+     api_url = 'https://catfact.ninja/fact'
+@@ -46,6 +53,13 @@ def my_posts(user, access):
+ def post(id_post):
+     '''Gets a single post and performs operations on it'''
+     post = get_post_by_id(id_post)
++    # Cambio para evitar que un usuario vea los post privados de otro usuario
++    current_user = session.get('user')
++    if post.access == False:
++        if current_user != post.author:
++            if post.access == False:
++                flash('No puedes hacer esto >:(')
++                return redirect(url_for('home.main'))
+     api_url = 'https://catfact.ninja/fact'
+     response = requests.get(api_url).content.decode('utf8') #Trucos sobre trucos
+     birthdays = get_birthdays(30)
+diff --git a/src/controller/profile.py b/src/controller/profile.py
+index d9b0e2a..6eb1328 100644
+--- a/src/controller/profile.py
++++ b/src/controller/profile.py
+@@ -1,12 +1,16 @@
+ import functools
+ import os
+ 
+-from flask import (render_template, Blueprint, g, redirect, request, session, url_for)
++# Cambio import de flash from flask
++from flask import (render_template, Blueprint, g, redirect, request, session, url_for, flash)
+ 
+ # Upload files secure
+ from werkzeug.utils import secure_filename
+ from src.controller.auth import requires_login
+ 
++# Cambio para usar generate_password_hash
++from werkzeug.security import generate_password_hash
++
+ # Maped rows to objects
+ from src.model.user import User
+ from src.model.post import Post
+@@ -20,6 +24,11 @@ profile = Blueprint('profile', __name__, url_prefix='/profile')
+ @profile.route('/<user>', methods=['GET', 'POST'])
+ @requires_login
+ def main(user):
++    # Cambio para evitar que un usuario vea el perfil de otro usuario
++    current_user = session.get('user')
++    if current_user != user:
++        flash('No puedes hacer esto >:(')
++        return redirect(url_for('home.main'))
+     '''Gets the user information and can update info when update'''
+     user = get_user(user)
+     if request.method == 'POST':
+@@ -28,18 +37,34 @@ def main(user):
+         birthday = request.form.get('birthday')
+         old_password = request.form.get('old_password')
+         new_password = request.form.get('new_password')
+-
++        # Cambio para usar generate_password_hash
++        password_hash = generate_password_hash(new_password)
++        # Cambio para actualizar los datos del usuario
++        """
+         user.first_name = first_name
+         user.second_name = second_name
+         user.birthday = birthday
+-
++        """
++        # Cambio para actualizar la contrasenia
++        """
+         if old_password and new_password:
+             if old_password == user.password:
+                 user.password = new_password
+             else:
+                 flash('Las contraseñas no coinciden')
+-
+-        add(user)
++        """
++        if old_password and new_password:
++            if check_password_hash(user[1], old_password):
++                # Cambio para actualizar los datos del usuario
++                cambio = User.update(User, user[0], first_name, second_name, birthday, password_hash)
++                if cambio == None:
++                    flash('Error al actualizar los datos')
++                else:
++                    flash('Datos actualizados')
++            else:
++                flash('Contrasenia incorrecta')    
++        # Cambio para actualizar los datos del usuario
++        #add(user)
+     return render_template('blog/profile.html',
+                            user = user)
+ 
+@@ -70,8 +95,32 @@ def create():
+ @profile.route('/update/<int:id_post>', methods=['GET', 'POST'])
+ @requires_login
+ def update(id_post):
++    # Cambio implementacion para poder editar un post
++    if request.method == 'POST':
++        title = request.form.get('title')
++        text = request.form.get('text').strip()
++        img = request.files['img']
++        access = 'access' in request.form
++        if img:
++            filename = secure_filename(img.filename)
++            abs_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
++            img.save(abs_path)
++            post_img = abs_path[5+8:]
++            cambio = Post.update(Post, id_post, title, text, access, post_img)
++        else:
++            cambio = Post.update(Post, id_post, title, text, access, None)
++        if cambio == None:
++            flash('Error al actualizar el post')
++        else:
++            flash('Post actualizado')
++        return redirect(url_for('home.main'))
+     '''Updates a post by this user'''
+     post = get_post_by_id(id_post)
++    # Cambio para evitar que un usuario actualice un post de otro usuario
++    current_user = session.get('user')
++    if current_user != post.author:
++        flash('No puedes hacer esto >:(')
++        return redirect(url_for('home.main'))
+     return render_template('blog/update.html', post = post)
+ 
+ @profile.route('/delete/<int:id_post>', methods=['GET', 'POST'])
+@@ -79,5 +128,13 @@ def update(id_post):
+ def delete(id_post):
+     '''Deletes a post by this user'''
+     post = get_post_by_id(id_post)
++    # Cambio para evitar que un usuario elimine un post de otro usuario
++    current_user = session.get('user')
++    if current_user != post.author:
++        flash('No puedes hacer esto >:(')
++        return redirect(url_for('home.main'))
+     remove(post)
+-    return redirect(url_for('profile.main', user = post.author))
++    # Cambio para redirigir a home.main en lugar de profile.main y agregar el mensaje de confirmacion
++    #return redirect(url_for('profile.main', user = post.author))
++    flash('Post eliminado')
++    return redirect(url_for('home.main'))
+diff --git a/src/model/post.py b/src/model/post.py
+index bac810e..a0730c8 100644
+--- a/src/model/post.py
++++ b/src/model/post.py
+@@ -31,3 +31,17 @@ class Post(db.Model):
+ 
+     def __repr__(self) -> str:
+         return f'{self.title}: {self.date}'
++    
++    # Cambio para actualizar los datos del post
++    def update(self, id, title, text, access, img):
++        post = Post.query.get(id)
++        if post:
++            post.title = title
++            post.text = text
++            post.access = access
++            if img != None:
++                post.img = img
++            db.session.commit()
++            return post
++        else:
++            return None
+diff --git a/src/model/repo.py b/src/model/repo.py
+index 80b9b3c..4abbb9c 100644
+--- a/src/model/repo.py
++++ b/src/model/repo.py
+@@ -5,15 +5,26 @@ from sqlalchemy.sql import text
+ from src.model.user import User
+ from src.model.post import Post
+ 
++# Cambio para usar check_password_hash
++from werkzeug.security import check_password_hash
++
+ 
+ from src import db
+ 
+ def get_user(username):
++    # Cambio para evitar SQL Injection al iniciar sesion
++    # En lugar de usar f-strings, usamos placeholders para los valores
+     '''Returns the username as python object'''
++    """
+     session = db.session()
+     query = text(f"SELECT * FROM user WHERE username = '{username}'")
+     cursor = session.execute(query).cursor
+     return cursor.fetchone()
++    """
++    session = db.session()
++    query = text("SELECT * FROM user WHERE username = :username")
++    result = session.execute(query, {'username': username})
++    return result.fetchone()
+ 
+ def get_all_public_posts():
+     '''Returns all public posts'''
+@@ -39,13 +50,27 @@ def get_birthdays(days):
+     )
+ 
+ def validate_user_and_password(username, password):
++    # Cambio para evitar SQL Injection al iniciar sesion
++    # En lugar de usar f-strings, usamos placeholders para los valores
++    # Cambio para usar check_password_hash
++    # En lugar de usar las contrasenias en texto plano, usamos hash
+     session = db.session()
+-    query = text(f"SELECT * FROM user WHERE username='{username}' AND password='{password}'")
++    #query = text(f"SELECT * FROM user WHERE username='{username}' AND password='{password}'")
++    query = text("SELECT * FROM user WHERE username = :username")
+     try:
+-        cursor = session.execute(query).cursor
++        #cursor = session.execute(query).cursor
++        result = session.execute(query, {'username': username})
++        user = result.fetchone()
++        pass
++        if user:
++            password1 = user.password
++            resultado = check_password_hash(password1, password)
++            if resultado:
++                return True
+     except:
+         return False
+-    return cursor.fetchone()
++    #return cursor.fetchone()
++    return False
+ 
+ 
+ def add(entity):
+diff --git a/src/model/user.py b/src/model/user.py
+index 264768d..0e556e0 100644
+--- a/src/model/user.py
++++ b/src/model/user.py
+@@ -31,3 +31,18 @@ class User(db.Model):
+ 
+     def __repr__(self) -> str:
+         return f'{self.username}: {self.first_name} {self.second_name}'
++    
++    # Cambio para actualizar los datos del usuario
++    def update(self, username, first_name, second_name, birthday, password):
++        user = User.query.filter_by(username=username).first()
++        if user:
++            user.first_name = first_name
++            user.second_name = second_name
++            user.birthday = birthday
++            user.password = password
++            db.session.commit()
++            return user
++        else:
++            return None
++
++ 
+\ No newline at end of file
+diff --git a/src/templates/blog/create.html b/src/templates/blog/create.html
+index 1148b5d..ac157ba 100644
+--- a/src/templates/blog/create.html
++++ b/src/templates/blog/create.html
+@@ -1,27 +1,20 @@
+-{% extends 'blog/home.html' %}
+-
+-{% block title %}
++{% extends 'blog/home.html' %} {% block title %}
+ <title>Create post</title>
+-{% endblock %}
+-
+-{% block script %}
++{% endblock %} {% block script %}
+ <script
+   type="text/javascript"
+-  src="{{ url_for('static', filename='js/script.js') }}">
+-</script>
+-{% endblock %}
+-
+-
+-{% block content %}
++  src="{{ url_for('static', filename='js/script.js') }}"
++></script>
++{% endblock %} {% block content %}
+ <div>
+-  <h2> Create new post </h2>
++  <h2>Create new post</h2>
+ </div>
+ 
+ <form enctype="multipart/form-data" method="POST">
+-  {{ macro.label_input('Title:', 'title', required='') }}
+-  {{ macro.label_input('Description:', 'text', type='textarea', required='') }}
+-  {{ macro.label_input('Image:', 'img', type='file', id='file') }}
+-  {{ macro.label_input('Public:', 'access', type='checkbox', checked='') }}
+-  {{ macro.label_input('', 'submit', value='Create post', type='submit') }}
++  {{ macro.label_input('Title:', 'title', required='') }} {{
++  macro.label_input('Description:', 'text', type='textarea', required='') }} {{
++  macro.label_input('Image:', 'img', type='file', id='file') }} {{
++  macro.label_input('Public:', 'access', type='checkbox', checked='') }} {{
++  macro.label_input('', 'submit', value='Create post', type='submit') }}
+ </form>
+ {% endblock %}
+diff --git a/src/templates/blog/profile.html b/src/templates/blog/profile.html
+index 7bd95a2..2c04a28 100644
+--- a/src/templates/blog/profile.html
++++ b/src/templates/blog/profile.html
+@@ -1,21 +1,22 @@
+-{% extends 'blog/home.html' %}
+-
+-{% block title %}
++{% extends 'blog/home.html' %} {% block title %}
+ <title>Perfil</title>
+-{% endblock %}
++{% endblock %} {% block content %}
++<h2>Profile</h2>
+ 
+-{% block content %}
+-<h2> Profile </h2>
+-
+-<form method='POST'>
+-  {{ macro.label_input('Username', 'username', placeholder=user[0], disabled='') }}
++<form method="POST">
++  {{ macro.label_input('Username', 'username', placeholder=user[0], disabled='')
++  }}
++  <!--
+   {{ macro.label_input('First Name:', 'first_name', value=user[1]) }}
+   {{ macro.label_input('Second Name:', 'second_name', value=user[2]) }}
+-  {{ macro.label_input('Birthday:', 'birthday', type='date', value=user[4] ) }}
+-  {{ macro.label_input('Old password', 'old_password', type='password') }}
+-  {{ macro.label_input('New password', 'new_password', type='password') }}
+-  {{ macro.label_input(value='Update', type='submit') }}
++-->
++  <!-- Cambio para no mostrar la contrasenia en el perfil -->
++  {{ macro.label_input('First Name:', 'first_name', value=user[2]) }} {{
++  macro.label_input('Second Name:', 'second_name', value=user[3]) }} {{
++  macro.label_input('Birthday:', 'birthday', type='date', value=user[4] ) }} {{
++  macro.label_input('Old password', 'old_password', type='password') }} {{
++  macro.label_input('New password', 'new_password', type='password') }} {{
++  macro.label_input(value='Update', type='submit') }}
+ </form>
+ 
+ {% endblock %}
+-
+diff --git a/src/templates/blog/update.html b/src/templates/blog/update.html
+index 11a588e..d8c770d 100644
+--- a/src/templates/blog/update.html
++++ b/src/templates/blog/update.html
+@@ -1,22 +1,22 @@
+-{% extends 'blog/home.html' %}
+-
+-{% block title %}
++{% extends 'blog/home.html' %} {% block title %}
+ <title>Update post</title>
+-{% endblock %}
+-
+-
+-{% block content %}
++{% endblock %} {% block script %}
++<!-- Cambio para poder editar el post -->
++<script
++  type="text/javascript"
++  src="{{ url_for('static', filename='js/script.js') }}"
++></script>
++{% endblock %} {% block content %}
+ <div>
+-  <h3> Update post </h3>
++  <h3>Update post</h3>
+ </div>
+ 
+-<form method="POST">
+-  {{ macro.label_input('Title:', 'title', value=post.title) }}
+-  {{ macro.label_input('Description:', 'text', type='textarea', value=post.text) }}
+-  {{ macro.label_input('Image:', 'img', type='file', value=post.img) }}
+-  {{ macro.label_input('Public:', 'access', type='checkbox') }}
+-  {{ macro.input(value='Update post', type='submit') }}
++<form enctype="multipart/form-data" method="POST">
++  {{ macro.label_input('Title:', 'title', required='', value=post.title) }} {{
++  macro.label_input('Description:', 'text', type='textarea', required='',
++  value=post.text) }} {{ macro.label_input('Image:', 'img', type='file',
++  id='file') }} {{ macro.label_input('Public:', 'access', type='checkbox',
++  checked=post.access) }} {{ macro.label_input('', 'submit', value='Update',
++  type='submit') }}
+ </form>
+ {% endblock %}
+-
+-

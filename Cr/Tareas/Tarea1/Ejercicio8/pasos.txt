@@ -1,0 +1,44 @@
+paso 1) quitar espacios del Criptograma_3.txt
+paso 2) ver las frecuencias de cada letra del criptograma sin espacios
+paso 3) notar que las letras más repetidas son I y L, por lo tanto podemos pensar que I -> e y L -> a (ya que e y a son las que tienen más frecuencia en Español)
+paso 4) generar mapeos aleatorios e intentar descifrar
+
+mapeo 1 {I:e, L:a}
+Buscar al dos palabras de longitud 6 (tomo varios intentos para obtener palabras con sentido o que aparecieran varias veces)
+palabras encontradas: "indigena" e "irisar", pero notamos que "indigena" aparece dos veces por lo tanto la usamos para modificar el mapeo
+
+mapeo 2 {A:i, E:g, G:n, I:e, J:d, L:a}
+Buscar al tres palabras de longitud 7 (tomo varios intentos para obtener palabras con sentido o que aparecieran varias veces)
+palabras encontradas: "esencia", "dependencia" y "pendencia", entonces usamos "esencia" y "depedencia" para modificar el mapeo
+
+mapeo 3 {A:i, E:g, G:n, I:e, J:d, K:p, L:a, Q:s, Z:c}
+Buscar al dos palabras de longitud 8 (tomo varios intentos para obtener palabras con sentido o que aparecieran varias veces)
+palabras encontradas: "representante" y "distinto", entonces las usamos para modificar el mapeo
+
+mapeo 4 {A:i, E:g, G:n, H:o, I:e, J:d, K:p, L:a, P:r, Q:s, R:t, S:u, Z:c}
+Esta vez solo corremos una vez el programa para que se sustituyan las letras y ver si podemos encontrar palabras en el texto
+palabras encontradas: "sobra" se encontro al ver "casi so_ra decir", "que" se encontro al ver "decir _ue en este",
+"la" se encontro al ver "esencia indigena _a participacion"
+con esas palabras modificamos el mapeo
+
+mapeo 5 {A:i, D:l, E:g, G:n, H:o, I:e, J:d, K:p, L:a, O:q, P:r, Q:s, R:t, S:u, U:b, Z:c} 
+Esta vez solo corremos una vez el programa para que se sustituyan las letras y ver si podemos encontrar palabras en el texto
+palabras encontradas: "sublimacion" se encontro al ver "este proceso de subli_acion de una"
+con esas palabras modificamos el mapeo
+
+mapeo 6 {A:i, D:l, E:g, F:m, G:n, H:o, I:e, J:d, K:p, L:a, O:q, P:r, Q:s, R:t, S:u, U:b, Z:c} 
+Esta vez solo corremos una vez el programa para que se sustituyan las letras y ver si podemos encontrar palabras en el texto
+palabras encontradas: "mujer", "fue" y "pasiva" se encontraron al ver "de esta mu_er _ue mas bien pasi_a",
+"y" se encontro "como representacion _ no como representante"
+con esas palabras modificamos el mapeo
+
+mapeo 7 {A:i, B:j, D:l, E:g, F:m, G:n, H:o, I:e, J:d, K:p, L:a, M:f, O:q, P:r, Q:s, R:t, S:u, T:v, U:b, X:y, Z:c}
+Esta vez solo corremos una vez el programa para que se sustituyan las letras y ver si podemos encontrar a quienes corresponden las letras Y y N (ya qye C, V y W no aparecen en el texto cifrado)
+palabras encontradas: "voz" se encontro al ver "tanto su vo_ como su imagen", 
+"hecha" se encontro al ver "representacion _ec_a por los"
+con esas palabras terminamos de modificar el mapeo
+
+mapeo final {A:i, B:j, D:l, E:g, F:m, G:n, H:o, I:e, J:d, K:p, L:a, M:f, N:h, O:q, P:r, Q:s, R:t, S:u, T:v, U:b, X:y, Y:z, Z:c} 
+mapeo total {A:i, B:j, C:x, D:l, E:g, F:m, G:n, H:o, I:e, J:d, K:p, L:a, M:f, N:h, O:q, P:r, Q:s, R:t, S:u, T:v, U:b, V:k, W:w, X:y, Y:z, Z:c} (los valores para C, V y W son aleatorios)
+
+Al final solo le agregamos espacios al texto descifrado

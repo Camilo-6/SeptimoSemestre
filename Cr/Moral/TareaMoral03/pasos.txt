@@ -1,0 +1,30 @@
+paso 1) quitar espacios y saltos de linea del criptograma_2.txt
+paso 2) sacar el indice de coincidencia de criptograma_2_s.txt (0.04176713979567001)
+paso 3) usar tabla para ver cuantos alfabetos se usan (8 a 9 alfabetos)
+paso 4) buscar cadenas repetidas de longitud 7 o mas y en que posiciones aparecen **** revisar quien puede ser una buena n ****
+paso 5) calcular la distancia entre las cadenas que se repiten
+paso 6) obtener factores primos de las distancias
+paso 7) usar los factores primos para dar una posible longitud de cadena (notamos que 2 y 5 aparecen en todos, por lo tanto puede ser 10)
+paso 8) dividir el texto en fragmentos de 10 caracteres
+paso 9) obtener el las frecuencias de los caracteres en la posicion 0 de los fragmentos de 10 caracteres --- por implementar ---
+paso 10) usar la tabla de Vigenere y las frecuencias del español para dar un posible primer caracter de la clave
+paso 11) repetir los pasos 9 y 10 para las demas posiciones
+paso 12) obtener una posible clave
+paso 13) descifrar el texto usando la clave
+paso 14) revisar si tiene sentido el texto descifrado, en caso que si terminamos, en otro caso repetir pasos del 9 al 14
+
+posibles claves:
+SUNTZARTEG
+S en posicion 0 (letras que aparecen mas fueron W y S, en la tabla [S][a]= S y [S][e]= W)
+U en posicion 1 (letras que aparecen mas fueron Y y U, en la tabla [U][a]= U y [U][e]= Y)
+N en posicion 2 (letras que aparecen mas fueron N, F y R, en la tabla [N][a]= N, [N][e]= R)
+T en posicion 3 (letras que aparecen mas fueron T y X, en la tabla [T][a]= T y [T][e]= X)
+Z en posicion 4 (letras que aparecen mas fueron Z, Q y D, en la tabla [Z][a]= Z y [Z][e]= D)
+A en posicion 5 (letras que aparecen mas fueron A y E, en la tabla [A][a]= A y [A][e]= E)
+R en posicion 6 (letras que aparecen mas fueron V y R, en la tabla [R][a]= R y [R][e]= V)
+T en posicion 7 (letras que aparecen mas fueron X, L y T, en la tabla [T][a]= T y [T][e]= X)
+E en posicion 8 (letras que aparecen mas fueron I y E, en la tabla [E][a]= E y [E][e]= I)
+G en posicion 9 (letras que aparecen mas fueron K y G, en la tabla [G][a]= G y [G][e]= K)
+
+notas
+se encontraron las palabras rodeadle, atacadle, divididle, superadle y sed, las cuales no tienen mucho sentido es como si en vez de "d" tuviera que ir una "r"
